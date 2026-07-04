@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedTech Stock Analyst | AI-Powered Predictions</title>
+  <meta name="description" content="Multi-agent AI stock analysis for JNJ, NVO, PFE, AMGN, GSK – powered by clinical trials, prescriber data, PubMed, government contracts and headline sentiment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ═══ ANIMATED BACKGROUND ═══ -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ═══ HEADER ═══ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">MedTech<span class="logo-accent">Analyst</span></span>
+    </div>
+    <div class="header-badge">Powered by Google ADK + MCP</div>
+  </div>
+</header>
+
+<!-- ═══ MAIN ═══ -->
+<main class="container">
+
+  <!-- ─ HERO ─ -->
+  <section class="hero">
+    <h1 class="hero-title">AI-Powered<br /><span class="gradient-text">MedTech Predictions</span></h1>
+    <p class="hero-sub">Five parallel indicator agents — clinical trials, prescriber data, PubMed, government contracts &amp; news sentiment — synthesised into a single, evidence-backed stock signal.</p>
+  </section>
+
+  <!-- ─ CONTROL PANEL ─ -->
+  <section class="glass-card control-panel" id="controlPanel">
+
+    <!-- Ticker selector -->
+    <div class="control-section">
+      <label class="control-label">Select Company</label>
+      <div class="ticker-grid" id="tickerGrid">
+        <button class="ticker-btn active" data-ticker="JNJ">
+          <span class="ticker-symbol">JNJ</span>
+          <span class="ticker-name">Johnson &amp; Johnson</span>
+        </button>
+        <button class="ticker-btn" data-ticker="NVO">
+          <span class="ticker-symbol">NVO</span>
+          <span class="ticker-name">Novo Nordisk</span>
+        </button>
+        <button class="ticker-btn" data-ticker="PFE">
+          <span class="ticker-symbol">PFE</span>
+          <span class="ticker-name">Pfizer</span>
+        </button>
+        <button class="ticker-btn" data-ticker="AMGN">
+          <span class="ticker-symbol">AMGN</span>
+          <span class="ticker-name">Amgen</span>
+        </button>
+        <button class="ticker-btn" data-ticker="GSK">
+          <span class="ticker-symbol">GSK</span>
+          <span class="ticker-name">GSK</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mode toggle -->
+    <div class="control-section">
+      <label class="control-label">Analysis Mode</label>
+      <div class="mode-toggle" id="modeToggle">
+        <button class="mode-btn active" data-mode="live" id="btnLive">
+          <span class="mode-icon">⚡</span> Live
+        </button>
+        <button class="mode-btn" data-mode="backtest" id="btnBacktest">
+          <span class="mode-icon">🕐</span> Backtest
+        </button>
+      </div>
+    </div>
+
+    <!-- Date picker (backtest only) -->
+    <div class="control-section" id="datePicker" style="display:none;">
+      <label class="control-label" for="asOfDate">As-of Date</label>
+      <div class="date-hint">All data filtered to information publicly available on this date</div>
+      <input class="date-input" type="date" id="asOfDate" max="" />
+    </div>
+
+    <!-- Run button -->
+    <button class="run-btn" id="runBtn" onclick="runAnalysis()">
+      <span class="run-btn-text">Run Analysis</span>
+      <span class="run-btn-icon">→</span>
+    </button>
+
+  </section>
+
+  <!-- ─ LOADING STATE ─ -->
+  <section class="glass-card loading-panel" id="loadingPanel" style="display:none;">
+    <div class="loading-spinner"></div>
+    <p class="loading-title">Dispatching Agents…</p>
+    <p class="loading-sub" id="loadingStep">Initialising parallel analysis pipeline</p>
+    <div class="agent-progress" id="agentProgress"></div>
+  </section>
+
+  <!-- ─ RESULTS ─ -->
+  <section id="resultsSection" style="display:none;">
+
+    <!-- Overall prediction banner -->
+    <div class="glass-card prediction-banner" id="predictionBanner">
+      <div class="prediction-left">
+        <div class="prediction-direction" id="predDirection">—</div>
+        <div class="prediction-label">Overall Signal</div>
+      </div>
+      <div class="prediction-center">
+        <div class="prediction-ticker" id="predTicker">—</div>
+        <div class="prediction-date" id="predDate">—</div>
+        <div class="prediction-magnitude" id="predMagnitude">—</div>
+      </div>
+      <div class="prediction-right">
+        <div class="confidence-label">Confidence</div>
+        <div class="confidence-ring-wrap">
+          <svg class="confidence-ring" viewBox="0 0 80 80">
+            <circle class="ring-bg" cx="40" cy="40" r="32" />
+            <circle class="ring-fill" id="confRingFill" cx="40" cy="40" r="32"
+              stroke-dasharray="201" stroke-dashoffset="201" />
+          </svg>
+          <div class="confidence-pct" id="confPct">0%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Indicator breakdown -->
+    <h2 class="section-title">Indicator Breakdown <span class="section-sub">ranked by contribution</span></h2>
+    <div class="indicators-grid" id="indicatorsGrid"></div>
+
+    <!-- Report -->
+    <h2 class="section-title">Full Analysis Report</h2>
+    <div class="glass-card report-card">
+      <div class="report-body" id="reportBody"></div>
+    </div>
+
+    <!-- Price context -->
+    <div class="glass-card price-card" id="priceCard" style="display:none;">
+      <h3 class="price-title">Price Context</h3>
+      <div id="priceContent"></div>
+    </div>
+
+    <!-- Run again -->
+    <button class="run-btn secondary-btn" onclick="resetUI()">← New Analysis</button>
+
+  </section>
+
+</main>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="site-footer">
+  <p>⚠️ For educational / research purposes only. Not financial advice.</p>
+  <p>Data sources: ClinicalTrials.gov · CMS Prescriber PUF · PubMed · USAspending.gov · GDELT · Yahoo Finance</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
