@@ -22,13 +22,22 @@ A multi-agent AI system that predicts short-term stock movements for five health
    pip install -r requirements.txt
    ```
 
-4. **Set up API keys** — copy and fill in the environment file (see [API Keys & Configuration](#api-keys--configuration)):
+4. **Set up authentication** — copy the environment file:
    ```
    cp .env.example .env
    ```
-   Edit `.env` with your Gemini API key (free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)). Without it, the LLM agents cannot run.
+   Then configure one of the two auth methods (see [API Keys & Configuration](#api-keys--configuration)):
 
-   > **Frontend key entry:** You can also enter your API key directly in the browser UI — see the settings panel at the top of the page. Keys entered in the browser are stored only in that session and never sent anywhere except to the Gemini API.
+   **Option A (recommended) — Vertex AI with Cloud free trial (£205 / $300):**
+   - Run: `gcloud auth application-default login`
+   - Enable the Agent Platform API in your GCP project (https://console.cloud.google.com/apis/api/aiplatform.googleapis.com)
+   - Uncomment and set `GOOGLE_CLOUD_PROJECT` in `.env`
+
+   **Option B — Gemini Developer API (20 requests/day free):**
+   - Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+   - Set `GEMINI_API_KEY` and `GOOGLE_GENAI_USE_VERTEXAI=False` in `.env`
+
+   > **Frontend key entry:** If using the Developer API, you can also enter your key in the browser settings panel (gear icon). Keys entered in the browser are stored only in that session.
 
 5. **Start the backend server**
    ```
@@ -48,20 +57,40 @@ A multi-agent AI system that predicts short-term stock movements for five health
 
 For full technical detail (schema definitions, MCP server internals, lookahead-bias table, adding indicators), see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## API Keys & Configuration
+## Authentication
 
-The project requires one credential to run:
+Two auth modes are supported:
 
-| Variable | Used by | How to get |
+### Option A — Vertex AI (recommended)
+
+Uses Google Cloud free trial credits (£205 / $300). No API key needed.
+
+| Variable | Required | Value |
 |---|---|---|
-| `GEMINI_API_KEY` | All LLM agents (via Google ADK) | Free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
-| `GOOGLE_GENAI_USE_VERTEXAI` | (alternative auth) | Set to `True` if using Vertex AI instead |
+| `GOOGLE_GENAI_USE_VERTEXAI` | Yes | `True` |
+| `GOOGLE_GENAI_USE_ENTERPRISE` | Yes | `True` |
+| `GOOGLE_CLOUD_PROJECT` | Yes | Your GCP project ID |
+| `GOOGLE_CLOUD_LOCATION` | Yes | `global` or `us-central1` |
+
+**Setup:**
+1. Run `gcloud auth application-default login`
+2. Enable [Agent Platform API](https://console.cloud.google.com/apis/api/aiplatform.googleapis.com) in your project
+3. Cloud free trial credits cover all usage automatically
+
+### Option B — Gemini Developer API (fallback)
+
+Free tier: 20 requests/day per project. Requires a Google AI Studio API key.
+
+| Variable | Required | Value |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Your key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `GOOGLE_GENAI_USE_VERTEXAI` | Yes | `False` |
 
 All variables go in `.env` at the project root (copy from `.env.example`). The `.env` file is listed in `.gitignore` — **never commit it**.
 
 All data-source MCP servers (ClinicalTrials.gov, CMS, PubMed, USAspending.gov, GDELT, yfinance) are free and require no API keys.
 
-**Frontend key entry:** If you are using the deployed public demo or just visiting the repo, you can enter your `GEMINI_API_KEY` directly in the browser settings panel (click the gear icon). The key is stored only in your browser session (in-memory), never persisted, and used only for the Gemini API calls.
+**Frontend key entry:** If using the Developer API, you can enter your `GEMINI_API_KEY` directly in the browser settings panel (gear icon). The key is stored only in your browser session, never persisted.
 
 ## Usage
 

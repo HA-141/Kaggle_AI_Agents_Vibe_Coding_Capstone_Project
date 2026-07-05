@@ -186,9 +186,10 @@ gcloud run deploy medtech-analyst \
   --image gcr.io/YOUR_PROJECT/medtech-analyst \
   --platform managed --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_GENAI_USE_VERTEXAI=True,\
+   --set-env-vars GOOGLE_GENAI_USE_VERTEXAI=True,\
+    GOOGLE_GENAI_USE_ENTERPRISE=True,\
     GOOGLE_CLOUD_PROJECT=YOUR_PROJECT,\
-    GOOGLE_CLOUD_LOCATION=us-central1
+    GOOGLE_CLOUD_LOCATION=global
 ```
 
 ## Common Errors
@@ -202,3 +203,4 @@ gcloud run deploy medtech-analyst \
 | `as_of_date is required in backtest mode` | Missing date in request | Pass `as_of_date` field |
 | `yfinance: No data found` | Weekend/holiday/future date | Use a past business day |
 | `401 UNAUTHENTICATED` Vertex AI | Missing or expired credentials | Run `gcloud auth application-default login` |
+| `429 prepayment credits depleted` (Developer API) | No billing on the Cloud project | Switch to Vertex AI, or add billing at https://console.cloud.google.com/billing |
