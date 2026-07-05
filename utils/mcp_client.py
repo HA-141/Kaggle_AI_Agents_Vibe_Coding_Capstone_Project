@@ -19,10 +19,24 @@ async def call_mcp_tool(server_filename: str, tool_name: str, arguments: dict) -
     if not os.path.exists(server_path):
         raise FileNotFoundError(f"MCP Server script not found at {server_path}")
         
+    # Security: pass only an allowlist of env vars to the subprocess.
+    # Never propagate the full parent environment — it may contain IDE tokens,
+    # SSH keys, or other credentials irrelevant to the MCP server.
+    _SAFE_ENV_KEYS = {
+        "PATH", "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV",
+        "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_GENAI_USE_ENTERPRISE",
+        "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION",
+        "GOOGLE_APPLICATION_CREDENTIALS", "GEMINI_API_KEY",
+        "LANG", "LC_ALL", "LC_CTYPE", "USERPROFILE", "HOME", "TEMP", "TMP",
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+        "http_proxy", "https_proxy", "no_proxy",
+    }
+    safe_env = {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
+
     server_params = StdioServerParameters(
         command=sys.executable,
         args=[server_path],
-        env=os.environ.copy()  # Pass current environment (like GEMINI_API_KEY)
+        env=safe_env,
     )
     
     try:

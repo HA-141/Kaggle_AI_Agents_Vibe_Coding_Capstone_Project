@@ -18,6 +18,7 @@ import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
+from contextlib import contextmanager
 
 # ── Ensure project root is on sys.path ──────────────────────────────────────
 _HERE = Path(__file__).resolve().parent
@@ -28,7 +29,7 @@ if str(_ROOT) not in sys.path:
 from dotenv import load_dotenv
 load_dotenv(_ROOT / ".env")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -43,6 +44,36 @@ logger = logging.getLogger(__name__)
 from fastapi.middleware.cors import CORSMiddleware
 import re
 from datetime import datetime
+
+
+# ── API Key helper ──────────────────────────────────────────────────────────
+# We allow the caller to supply a Gemini API key via the X-Gemini-API-Key header.
+# This key is set in the process environment for the duration of the request
+# so that the ADK agent framework can pick it up.  The key is never logged or
+# persisted on the server side.
+
+_GEMINI_API_KEY_VAR = "GEMINI_API_KEY"
+
+@contextmanager
+def _use_api_key(user_key: Optional[str]):
+    """Temporarily replace the GEMINI_API_KEY env var for one request."""
+    old = os.environ.get(_GEMINI_API_KEY_VAR)
+    if user_key:
+        os.environ[_GEMINI_API_KEY_VAR] = user_key
+        logger.info("Using user-provided Gemini API key for this request")
+    try:
+        yield
+    finally:
+        if user_key and old:
+            os.environ[_GEMINI_API_KEY_VAR] = old
+        elif user_key and not old:
+            os.environ.pop(_GEMINI_API_KEY_VAR, None)
+
+
+SERVER_HAS_API_KEY = bool(
+    os.environ.get(_GEMINI_API_KEY_VAR)
+    and os.environ[_GEMINI_API_KEY_VAR] != "your_gemini_api_key_here"
+)
 
 app = FastAPI(
     title="MedTech Stock Analyst API",
@@ -129,13 +160,15 @@ async def get_tickers():
 
 
 @app.post("/api/predict")
-async def predict(req: PredictRequest):
+async def predict(req: PredictRequest, request: Request = None):
     """
     Run the full multi-agent analysis pipeline.
 
     In live mode: fetches the latest available data for each indicator.
     In backtest mode: filters every data source to only information that was
     genuinely public on or before `as_of_date`.
+
+    Accepts an optional X-Gemini-API-Key header for user-provided API keys.
 
     Returns the full orchestrator payload.
     """
@@ -149,14 +182,19 @@ async def predict(req: PredictRequest):
         
     as_of_date = validate_as_of_date(req.as_of_date, required=(req.mode == "backtest"))
 
-    logger.info("predict request: ticker=%s mode=%s as_of_date=%s", ticker, req.mode, as_of_date)
+    # Extract user API key from header (never logged)
+    user_key = request.headers.get("x-gemini-api-key") if request else None
+
+    logger.info("predict request: ticker=%s mode=%s as_of_date=%s api_key_provided=%s",
+                ticker, req.mode, as_of_date, bool(user_key))
 
     try:
-        result = await run_analysis(
-            ticker=ticker,
-            mode=req.mode,
-            as_of_date=as_of_date,
-        )
+        with _use_api_key(user_key):
+            result = await run_analysis(
+                ticker=ticker,
+                mode=req.mode,
+                as_of_date=as_of_date,
+            )
         return JSONResponse(content=result)
     except Exception as exc:
         logger.error("predict failed for %s: %s", ticker, exc, exc_info=True)
@@ -168,7 +206,7 @@ async def predict(req: PredictRequest):
 
 
 @app.post("/api/backtest")
-async def backtest_single(req: BacktestRequest):
+async def backtest_single(req: BacktestRequest, request: Request = None):
     """
     Run a single dated backtest: predict, then score against actual forward return.
     """
@@ -181,14 +219,18 @@ async def backtest_single(req: BacktestRequest):
             detail="forward_days must be between 1 and 30."
         )
 
-    logger.info("backtest request: ticker=%s date=%s fwd_days=%d", ticker, as_of_date, req.forward_days)
+    user_key = request.headers.get("x-gemini-api-key") if request else None
+
+    logger.info("backtest request: ticker=%s date=%s fwd_days=%d api_key_provided=%s",
+                ticker, as_of_date, req.forward_days, bool(user_key))
 
     try:
-        result = await run_backtest_pair(
-            ticker=ticker,
-            as_of_date=as_of_date,
-            forward_days=req.forward_days,
-        )
+        with _use_api_key(user_key):
+            result = await run_backtest_pair(
+                ticker=ticker,
+                as_of_date=as_of_date,
+                forward_days=req.forward_days,
+            )
         return JSONResponse(content=result)
     except Exception as exc:
         logger.error("backtest failed for %s: %s", ticker, exc, exc_info=True)
@@ -197,6 +239,12 @@ async def backtest_single(req: BacktestRequest):
             status_code=500,
             detail="An internal server error occurred while processing the backtest."
         )
+
+
+@app.get("/api/key-status")
+async def key_status():
+    """Return whether a server-side API key is configured."""
+    return {"server_has_key": SERVER_HAS_API_KEY}
 
 
 @app.get("/health")

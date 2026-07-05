@@ -1,96 +1,101 @@
 # MedTech Stock Analyst
 
-## Overview
-This repository implements a **multi‑agent system** using the **Agent Development Kit (ADK)** to predict and explain stock price movements for five med‑tech, biotech, and pharma companies (JNJ, NVO, PFE, AMGN, GSK).  Agents independently gather publicly available data (clinical trials, CMS prescriber data, PubMed, USAspending, GDELT) and a price data source, combine their signals with an Ensemble agent, and produce a human‑readable report.
+A multi-agent AI system that predicts short-term stock movements for five healthcare companies (JNJ, NVO, PFE, AMGN, GSK) by analysing clinical trials, Medicare prescriber data, PubMed publications, government contracts, and news sentiment.
 
-## Architecture
-- **Orchestrator Agent** – entry point; validates inputs, dispatches six agents in parallel, forwards results to the Ensemble and Report‑Writer.
-- **Indicator Agents** (5) – each wraps a dedicated MCP server that fetches and processes a specific data source.  All agents return a **standard JSON schema**.
-- **Price Data Agent** – provides historical price series and forward return for back‑testing.
-- **Ensemble / Ranking Agent** – weighted aggregation of indicator signals, identifies mainstream vs. under‑covered signals.
-- **Report‑Writer Agent** – formats the ensemble output into a concise narrative with citations.
-- **MCP Servers** – lightweight wrappers around public APIs (ClinicalTrials.gov, CMS Prescriber PUF, PubMed E‑utilities, USAspending, GDELT, yfinance).  No API keys are hard‑coded; values are read from `.env`.
-- **Back‑test Runner** – orchestrates historical runs, enforces look‑ahead‑bias limits, scores predictions.
-- **Frontend** – vanilla HTML/JS UI allowing the user to select a ticker, mode (live/backtest), and an optional date for back‑testing.  Results are displayed with the prediction and a breakdown of contributing indicators.
+## Quick-Start
 
-## Setup
-1. **Clone the repo**
-   ```bash
-   git clone <repo‑url>
+1. **Clone and enter the repo**
+   ```
+   git clone <repo-url>
    cd Kaggle-AI-Agents-MedTech-Stock-Analyst
    ```
-2. **Create a virtual environment**
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+2. **Create a virtual environment** (Python 3.11+)
    ```
+   python -m venv .venv
+   .venv\Scripts\activate        # Windows
+   source .venv/bin/activate     # macOS / Linux
+   ```
+
 3. **Install dependencies**
-   ```bash
+   ```
    pip install -r requirements.txt
    ```
-4. **Configure environment variables**
-   ```bash
+
+4. **Set up API keys** — copy and fill in the environment file (see [API Keys & Configuration](#api-keys--configuration)):
+   ```
    cp .env.example .env
-   # Fill in any needed API keys (e.g., FDA, USAspending) – most data sources are public.
    ```
-5. **Start MCP servers** (each runs in its own process; a helper script is provided)
-   ```bash
-   python -m mcp_servers.run_all
+   Edit `.env` with your Gemini API key (free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)). Without it, the LLM agents cannot run.
+
+   > **Frontend key entry:** You can also enter your API key directly in the browser UI — see the settings panel at the top of the page. Keys entered in the browser are stored only in that session and never sent anywhere except to the Gemini API.
+
+5. **Start the backend server**
    ```
-6. **Run the backend** (a tiny FastAPI wrapper that launches the Orchestrator)
-   ```bash
-   uvicorn backend:app --reload
+   python frontend/server.py
    ```
-7. **Open the frontend** – navigate to `frontend/index.html` in a browser (or use the dev server that ships with the FastAPI static files).
+
+6. **Open the UI** at [http://localhost:8000](http://localhost:8000), select a company and click **Run Analysis**.
+
+## Architecture Overview
+
+- **Orchestrator** — entry point that dispatches all 6 agents in parallel, collects results, and passes them to the ensemble and report writer.
+- **5 Indicator Agents** — each wraps an MCP server that calls a public data source (ClinicalTrials.gov, CMS Prescriber PUF, PubMed, USAspending.gov, GDELT). All return the same standardised JSON schema.
+- **Price Data Agent** — fetches historical OHLCV prices from yfinance. In backtest mode, data is strictly capped at the as-of date.
+- **Ensemble / Ranking Agent** — a pure-reasoning LLM agent that weighs the five indicator signals by confidence, ranks them, and tags each as mainstream (priced in) vs. under-covered (leading signal).
+- **Report Writer Agent** — formats the ensemble output into a readable markdown report with source citations and a disclaimer.
+- **Backtest Runner** — runs historical predictions, enforces release-lag lookahead filtering for each data source, then scores predictions against actual forward returns.
+
+For full technical detail (schema definitions, MCP server internals, lookahead-bias table, adding indicators), see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## API Keys & Configuration
+
+The project requires one credential to run:
+
+| Variable | Used by | How to get |
+|---|---|---|
+| `GEMINI_API_KEY` | All LLM agents (via Google ADK) | Free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `GOOGLE_GENAI_USE_VERTEXAI` | (alternative auth) | Set to `True` if using Vertex AI instead |
+
+All variables go in `.env` at the project root (copy from `.env.example`). The `.env` file is listed in `.gitignore` — **never commit it**.
+
+All data-source MCP servers (ClinicalTrials.gov, CMS, PubMed, USAspending.gov, GDELT, yfinance) are free and require no API keys.
+
+**Frontend key entry:** If you are using the deployed public demo or just visiting the repo, you can enter your `GEMINI_API_KEY` directly in the browser settings panel (click the gear icon). The key is stored only in your browser session (in-memory), never persisted, and used only for the Gemini API calls.
 
 ## Usage
-### Live Mode
-- Choose a ticker, set mode to **Live**, and click **Run**.
-- The system fetches the latest data, produces a prediction, and displays the report.
 
-### Back‑test Mode
-- Select a ticker, set mode to **Backtest**, and provide an **as‑of date** (YYYY‑MM‑DD).
-- The runner filters each data source by its real‑world release lag (e.g., CMS data 18‑24 months) so that only information available on that date is used.
-- After the prediction is generated, the forward return (price change over the next N trading days) is fetched and the result is scored.
-- The UI shows the prediction, the back‑tested forward return, and the accuracy summary.
+### Live mode
+Select a ticker, set mode to **Live**, click **Run**. The system fetches the latest data and produces a prediction.
 
-## Project Structure
-```
-Kaggle-AI-Agents-MedTech-Stock-Analyst/
-├─ agents/
-│   ├─ orchestrator/
-│   ├─ indicators/
-│   │   ├─ clinical_trials_agent.py
-│   │   ├─ physician_adoption_agent.py
-│   │   ├─ pubmed_agent.py
-│   │   ├─ usaspending_agent.py
-│   │   └─ gdelt_agent.py
-│   ├─ price_data/
-│   ├─ ensemble_ranking/
-│   └─ report_writer/
-├─ mcp_servers/
-│   ├─ clinical_trials.py
-│   ├─ cms_prescriber.py
-│   ├─ pubmed.py
-│   ├─ usaspending.py
-│   ├─ gdelt.py
-│   └─ price_data.py
-├─ backtest/runner.py
-├─ frontend/
-│   ├─ index.html
-│   └─ static/
-│       ├─ style.css
-│       └─ app.js
-├─ utils/
-│   └─ mcp_tools.py
-├─ .env.example
-├─ requirements.txt
-├─ README.md
-└─ DEVELOPER_GUIDE.md
+### Backtest mode
+Select a ticker, set mode to **Backtest**, provide an as-of date (YYYY-MM-DD). Each data source is filtered by its real-world release lag so only information available on that date is used. After the prediction is generated, the forward return is fetched and the result is scored.
+
+### CLI (without browser)
+```bash
+# Live
+python -m agents.orchestrator.orchestrator --ticker JNJ --mode live
+
+# Backtest
+python -m agents.orchestrator.orchestrator --ticker NVO --mode backtest --date 2023-06-01
+
+# Backtest runner with scoring
+python -m backtest.runner --pairs JNJ:2023-01-15 PFE:2023-09-01
 ```
 
-## Contributing
-Feel free to open issues or PRs.  When adding a new indicator, follow the same schema and update the orchestrator’s dispatch list.
+## Deployment
+
+The app runs on any machine with Python. For public deployment, the recommended approach is Google Cloud Run (see [ARCHITECTURE.md](ARCHITECTURE.md) for the Dockerfile). A live demo — when deployed — will be linked here.
+
+## Limitations & Future Work
+
+- **LLM dependency:** The ensemble and report-writer agents require a Gemini API call. Without one (or without Vertex AI), the system degrades to neutral fallbacks.
+- **Simplified lag model:** Release lags are implemented as fixed constants (e.g., CMS 21 months, PubMed 14 days). Real-world data availability can vary.
+- **Five-company universe:** Only JNJ, NVO, PFE, AMGN, GSK are supported. Adding tickers requires updating MCP server mappings and orchestrator validation.
+- **Indicators not yet built:** Regulatory approval tracking, patent cliff monitoring, and earnings-call sentiment are scoped out.
+- **Backtest scoring is directional:** The magnitude hit/miss comparison uses the ensemble's plain-text range, which is approximate.
+- **No authentication on the web UI:** The frontend is unprotected — suitable for demos and local use only.
 
 ---
-*This README is designed for a public GitHub repository.*
+
+*For detailed schema definitions, MCP server documentation, indicator-addition guide, and common errors, see [ARCHITECTURE.md](ARCHITECTURE.md).*

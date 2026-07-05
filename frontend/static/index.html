@@ -25,9 +25,33 @@
       <span class="logo-icon">⬡</span>
       <span class="logo-text">MedTech<span class="logo-accent">Analyst</span></span>
     </div>
-    <div class="header-badge">Powered by Google ADK + MCP</div>
+    <div class="header-right">
+      <span class="key-indicator" id="keyIndicator" title="API Key Status">⚙</span>
+      <div class="header-badge">Powered by Google ADK + MCP</div>
+    </div>
   </div>
 </header>
+
+<!-- ═══ SETTINGS PANEL ═══ -->
+<section class="glass-card settings-panel" id="settingsPanel" style="display:none;">
+  <div class="settings-header">
+    <h3>API Key Settings</h3>
+    <button class="settings-close" onclick="toggleSettings()">✕</button>
+  </div>
+  <div class="settings-body">
+    <label class="control-label" for="apiKeyInput">Gemini API Key</label>
+    <div class="settings-hint">Enter your key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored only in this browser session.</div>
+    <input class="date-input" type="password" id="apiKeyInput" placeholder="Paste your Gemini API key here" />
+    <div class="settings-status" id="apiKeyStatus">
+      <span class="status-dot" id="keyStatusDot"></span>
+      <span id="keyStatusText">Checking server configuration…</span>
+    </div>
+    <div class="settings-actions">
+      <button class="run-btn" onclick="saveApiKey()" style="flex:1;">Apply Key</button>
+      <button class="run-btn secondary-btn" onclick="clearApiKey()" style="flex:1;">Clear Key</button>
+    </div>
+  </div>
+</section>
 
 <!-- ═══ MAIN ═══ -->
 <main class="container">

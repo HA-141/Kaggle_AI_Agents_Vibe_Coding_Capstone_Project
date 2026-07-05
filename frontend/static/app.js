@@ -4,6 +4,91 @@
 // ── State ─────────────────────────────────────────────────
 let selectedTicker = 'JNJ';
 let selectedMode   = 'live';
+let userApiKey     = '';  // NEVER logged; stored only in this JS variable
+
+// ── API Key helpers ────────────────────────────────────────
+// The key is stored in sessionStorage so it persists during the browser tab
+// session but is NEVER written to localStorage, never sent to any server
+// other than the intended Gemini API via the backend proxy, and never logged.
+
+function loadApiKey() {
+  try {
+    userApiKey = sessionStorage.getItem('gemini_api_key') || '';
+  } catch(e) {
+    userApiKey = '';
+  }
+  updateKeyIndicator();
+}
+
+function saveApiKey() {
+  const input = document.getElementById('apiKeyInput');
+  const key   = input.value.trim();
+  if (key) {
+    try { sessionStorage.setItem('gemini_api_key', key); } catch(e) {}
+    userApiKey = key;
+    updateKeyIndicator();
+    showKeyStatus('user', 'User-provided key active');
+  }
+  input.value = '';
+  toggleSettings();
+}
+
+function clearApiKey() {
+  try { sessionStorage.removeItem('gemini_api_key'); } catch(e) {}
+  userApiKey = '';
+  updateKeyIndicator();
+  document.getElementById('apiKeyInput').value = '';
+  document.getElementById('apiKeyStatus').style.display = 'block';
+  showKeyStatus('none', 'No user key set');
+  toggleSettings();
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function updateKeyIndicator() {
+  const dot   = document.getElementById('keyStatusDot');
+  const text  = document.getElementById('keyStatusText');
+  const indicator = document.getElementById('keyIndicator');
+
+  if (userApiKey) {
+    dot.className = 'status-dot dot-user';
+    text.textContent = 'User-provided key (this session)';
+    indicator.title = 'User API key active';
+    indicator.style.opacity = '1';
+    return;
+  }
+
+  // Check server-side key
+  try {
+    const res = await fetch('/api/key-status');
+    const data = await res.json();
+    if (data.server_has_key) {
+      dot.className = 'status-dot dot-server';
+      text.textContent = 'Server default key active';
+      indicator.title = 'Server default API key';
+      indicator.style.opacity = '1';
+    } else {
+      dot.className = 'status-dot dot-none';
+      text.textContent = 'No API key configured — LLM agents will use fallback';
+      indicator.title = 'No API key — fallback mode';
+      indicator.style.opacity = '0.6';
+    }
+  } catch(e) {
+    dot.className = 'status-dot dot-unknown';
+    text.textContent = 'Could not check server key status';
+    indicator.title = 'Key status unknown';
+  }
+}
+
+function showKeyStatus(mode, msg) {
+  const statusEl = document.getElementById('apiKeyStatus');
+  statusEl.style.display = 'block';
+  document.getElementById('keyStatusDot').className = 'status-dot dot-' + mode;
+  document.getElementById('keyStatusText').textContent = msg;
+}
 
 // ── Ticker selection ──────────────────────────────────────
 document.querySelectorAll('.ticker-btn').forEach(btn => {
@@ -107,10 +192,16 @@ async function runAnalysis() {
   const payload = { ticker, mode };
   if (mode === 'backtest') payload.as_of_date = asOfDate;
 
+  // Build headers — include user API key if set, NEVER log it
+  const headers = { 'Content-Type': 'application/json' };
+  if (userApiKey) {
+    headers['X-Gemini-API-Key'] = userApiKey;
+  }
+
   try {
     const res  = await fetch('/api/predict', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(payload),
     });
 
@@ -288,3 +379,11 @@ function resetUI() {
   document.getElementById('controlPanel').style.display  = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ── Init ──────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Gear icon opens settings
+  document.getElementById('keyIndicator').addEventListener('click', toggleSettings);
+  // Load persisted key from sessionStorage
+  loadApiKey();
+});
