@@ -1,5 +1,17 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Literal, Dict
+
+
+def _schema_strip_additional_properties(schema):
+    """Recursively remove additionalProperties from a JSON schema dict."""
+    if isinstance(schema, dict):
+        schema.pop("additionalProperties", None)
+        for value in schema.values():
+            _schema_strip_additional_properties(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            _schema_strip_additional_properties(item)
+
 
 class IndicatorOutput(BaseModel):
     indicator: str = Field(..., description="The name of the indicator analyzed")
@@ -14,6 +26,7 @@ class IndicatorOutput(BaseModel):
     sources: List[str] = Field(..., description="The sources/endpoints used (URLs or dataset names)")
 
 class EnsembleOutput(BaseModel):
+    model_config = ConfigDict(json_schema_extra=lambda s: _schema_strip_additional_properties(s))
     direction: Literal["bullish", "bearish", "neutral"] = Field(..., description="The overall synthesized price direction")
     confidence: float = Field(..., description="Overall confidence score from 0.0 to 1.0", ge=0.0, le=1.0)
     magnitude_range: str = Field(..., description="Synthesized plain-language range (e.g. '+1% to +3% over 5 trading days')")

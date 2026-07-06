@@ -46,17 +46,24 @@ import re
 from datetime import datetime
 
 
-# ── API Key helper ──────────────────────────────────────────────────────────
-# We allow the caller to supply a Gemini API key via the X-Gemini-API-Key header.
-# This key is set in the process environment for the duration of the request
-# so that the ADK agent framework can pick it up.  The key is never logged or
-# persisted on the server side.
+# ── API / Auth helpers ─────────────────────────────────────────────────────
+# Two modes:
+#   Vertex AI (recommended) — uses gcloud ADC + Cloud free trial credits.
+#   Gemini Developer API    — uses an API key from AI Studio.
+#
+# When in Vertex mode, the X-Gemini-API-Key header is ignored.
+
+_IS_VERTEX_MODE = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true" or \
+                  os.environ.get("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() == "true"
 
 _GEMINI_API_KEY_VAR = "GEMINI_API_KEY"
 
 @contextmanager
 def _use_api_key(user_key: Optional[str]):
     """Temporarily replace the GEMINI_API_KEY env var for one request."""
+    if _IS_VERTEX_MODE:
+        yield
+        return
     old = os.environ.get(_GEMINI_API_KEY_VAR)
     if user_key:
         os.environ[_GEMINI_API_KEY_VAR] = user_key
@@ -70,7 +77,7 @@ def _use_api_key(user_key: Optional[str]):
             os.environ.pop(_GEMINI_API_KEY_VAR, None)
 
 
-SERVER_HAS_API_KEY = bool(
+SERVER_HAS_API_KEY = _IS_VERTEX_MODE or bool(
     os.environ.get(_GEMINI_API_KEY_VAR)
     and os.environ[_GEMINI_API_KEY_VAR] != "your_gemini_api_key_here"
 )
@@ -243,8 +250,12 @@ async def backtest_single(req: BacktestRequest, request: Request = None):
 
 @app.get("/api/key-status")
 async def key_status():
-    """Return whether a server-side API key is configured."""
-    return {"server_has_key": SERVER_HAS_API_KEY}
+    """Return auth status and mode."""
+    return {
+        "server_has_key": SERVER_HAS_API_KEY,
+        "mode": "vertex" if _IS_VERTEX_MODE else "developer_api",
+        "project": os.environ.get("GOOGLE_CLOUD_PROJECT", "") if _IS_VERTEX_MODE else None,
+    }
 
 
 @app.get("/health")

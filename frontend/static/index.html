@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
 
@@ -26,32 +27,11 @@
       <span class="logo-text">MedTech<span class="logo-accent">Analyst</span></span>
     </div>
     <div class="header-right">
-      <span class="key-indicator" id="keyIndicator" title="API Key Status">⚙</span>
+      <span class="key-indicator" id="keyIndicator">&#9679; Vertex AI</span>
       <div class="header-badge">Powered by Google ADK + MCP</div>
     </div>
   </div>
 </header>
-
-<!-- ═══ SETTINGS PANEL ═══ -->
-<section class="glass-card settings-panel" id="settingsPanel" style="display:none;">
-  <div class="settings-header">
-    <h3>API Key Settings</h3>
-    <button class="settings-close" onclick="toggleSettings()">✕</button>
-  </div>
-  <div class="settings-body">
-    <label class="control-label" for="apiKeyInput">Gemini API Key</label>
-    <div class="settings-hint">Enter your key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored only in this browser session.</div>
-    <input class="date-input" type="password" id="apiKeyInput" placeholder="Paste your Gemini API key here" />
-    <div class="settings-status" id="apiKeyStatus">
-      <span class="status-dot" id="keyStatusDot"></span>
-      <span id="keyStatusText">Checking server configuration…</span>
-    </div>
-    <div class="settings-actions">
-      <button class="run-btn" onclick="saveApiKey()" style="flex:1;">Apply Key</button>
-      <button class="run-btn secondary-btn" onclick="clearApiKey()" style="flex:1;">Clear Key</button>
-    </div>
-  </div>
-</section>
 
 <!-- ═══ MAIN ═══ -->
 <main class="container">
@@ -139,8 +119,10 @@
       </div>
       <div class="prediction-center">
         <div class="prediction-ticker" id="predTicker">—</div>
+        <div class="prediction-company" id="predCompanyName"></div>
         <div class="prediction-date" id="predDate">—</div>
         <div class="prediction-magnitude" id="predMagnitude">—</div>
+    <div class="prediction-range" id="predRange"></div>
       </div>
       <div class="prediction-right">
         <div class="confidence-label">Confidence</div>
@@ -167,7 +149,10 @@
 
     <!-- Price context -->
     <div class="glass-card price-card" id="priceCard" style="display:none;">
-      <h3 class="price-title">Price Context</h3>
+      <h3 class="price-title">Price Context — <span id="priceTicker"></span></h3>
+      <div class="chart-box">
+        <canvas id="comboChart"></canvas>
+      </div>
       <div id="priceContent"></div>
     </div>
 

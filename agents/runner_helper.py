@@ -26,8 +26,10 @@ async def run_adk_agent(
     """
     logger.info(f"Running agent '{agent.name}' with message: {user_message}")
     
-    # Check for API Key
-    if not os.environ.get("GEMINI_API_KEY"):
+    # Check for API Key (not needed in Vertex/Enterprise mode)
+    _is_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true" or \
+                 os.environ.get("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() == "true"
+    if not _is_vertex and not os.environ.get("GEMINI_API_KEY"):
         logger.warning("Warning: GEMINI_API_KEY is not set in environment or .env file.")
         
     try:

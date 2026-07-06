@@ -37,8 +37,6 @@ A multi-agent AI system that predicts short-term stock movements for five health
    - Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
    - Set `GEMINI_API_KEY` and `GOOGLE_GENAI_USE_VERTEXAI=False` in `.env`
 
-   > **Frontend key entry:** If using the Developer API, you can also enter your key in the browser settings panel (gear icon). Keys entered in the browser are stored only in that session.
-
 5. **Start the backend server**
    ```
    python frontend/server.py
@@ -90,8 +88,6 @@ All variables go in `.env` at the project root (copy from `.env.example`). The `
 
 All data-source MCP servers (ClinicalTrials.gov, CMS, PubMed, USAspending.gov, GDELT, yfinance) are free and require no API keys.
 
-**Frontend key entry:** If using the Developer API, you can enter your `GEMINI_API_KEY` directly in the browser settings panel (gear icon). The key is stored only in your browser session, never persisted.
-
 ## Usage
 
 ### Live mode
@@ -123,7 +119,7 @@ The app runs on any machine with Python. For public deployment, the recommended 
 - **Five-company universe:** Only JNJ, NVO, PFE, AMGN, GSK are supported. Adding tickers requires updating MCP server mappings and orchestrator validation.
 - **Indicators not yet built:** Regulatory approval tracking, patent cliff monitoring, and earnings-call sentiment are scoped out.
 - **Backtest scoring is directional:** The magnitude hit/miss comparison uses the ensemble's plain-text range, which is approximate.
-- **No authentication on the web UI:** The frontend is unprotected — suitable for demos and local use only.
+- **Server-side auth only:** Authentication is handled server-side via Vertex AI or a `.env`-configured Developer API key. The frontend has no user-facing login — suitable for demos and local use only.
 
 ---
 

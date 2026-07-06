@@ -4,91 +4,15 @@
 // ── State ─────────────────────────────────────────────────
 let selectedTicker = 'JNJ';
 let selectedMode   = 'live';
-let userApiKey     = '';  // NEVER logged; stored only in this JS variable
 
-// ── API Key helpers ────────────────────────────────────────
-// The key is stored in sessionStorage so it persists during the browser tab
-// session but is NEVER written to localStorage, never sent to any server
-// other than the intended Gemini API via the backend proxy, and never logged.
-
-function loadApiKey() {
-  try {
-    userApiKey = sessionStorage.getItem('gemini_api_key') || '';
-  } catch(e) {
-    userApiKey = '';
-  }
-  updateKeyIndicator();
-}
-
-function saveApiKey() {
-  const input = document.getElementById('apiKeyInput');
-  const key   = input.value.trim();
-  if (key) {
-    try { sessionStorage.setItem('gemini_api_key', key); } catch(e) {}
-    userApiKey = key;
-    updateKeyIndicator();
-    showKeyStatus('user', 'User-provided key active');
-  }
-  input.value = '';
-  toggleSettings();
-}
-
-function clearApiKey() {
-  try { sessionStorage.removeItem('gemini_api_key'); } catch(e) {}
-  userApiKey = '';
-  updateKeyIndicator();
-  document.getElementById('apiKeyInput').value = '';
-  document.getElementById('apiKeyStatus').style.display = 'block';
-  showKeyStatus('none', 'No user key set');
-  toggleSettings();
-}
-
-function toggleSettings() {
-  const panel = document.getElementById('settingsPanel');
-  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-}
-
-async function updateKeyIndicator() {
-  const dot   = document.getElementById('keyStatusDot');
-  const text  = document.getElementById('keyStatusText');
-  const indicator = document.getElementById('keyIndicator');
-
-  if (userApiKey) {
-    dot.className = 'status-dot dot-user';
-    text.textContent = 'User-provided key (this session)';
-    indicator.title = 'User API key active';
-    indicator.style.opacity = '1';
-    return;
-  }
-
-  // Check server-side key
-  try {
-    const res = await fetch('/api/key-status');
-    const data = await res.json();
-    if (data.server_has_key) {
-      dot.className = 'status-dot dot-server';
-      text.textContent = 'Server default key active';
-      indicator.title = 'Server default API key';
-      indicator.style.opacity = '1';
-    } else {
-      dot.className = 'status-dot dot-none';
-      text.textContent = 'No API key configured — LLM agents will use fallback';
-      indicator.title = 'No API key — fallback mode';
-      indicator.style.opacity = '0.6';
-    }
-  } catch(e) {
-    dot.className = 'status-dot dot-unknown';
-    text.textContent = 'Could not check server key status';
-    indicator.title = 'Key status unknown';
-  }
-}
-
-function showKeyStatus(mode, msg) {
-  const statusEl = document.getElementById('apiKeyStatus');
-  statusEl.style.display = 'block';
-  document.getElementById('keyStatusDot').className = 'status-dot dot-' + mode;
-  document.getElementById('keyStatusText').textContent = msg;
-}
+// ── Company name lookup ──────────────────────────────────
+const COMPANY_NAMES = {
+  JNJ: 'Johnson & Johnson',
+  NVO: 'Novo Nordisk',
+  PFE: 'Pfizer',
+  AMGN: 'Amgen',
+  GSK: 'GSK',
+};
 
 // ── Ticker selection ──────────────────────────────────────
 document.querySelectorAll('.ticker-btn').forEach(btn => {
@@ -192,16 +116,10 @@ async function runAnalysis() {
   const payload = { ticker, mode };
   if (mode === 'backtest') payload.as_of_date = asOfDate;
 
-  // Build headers — include user API key if set, NEVER log it
-  const headers = { 'Content-Type': 'application/json' };
-  if (userApiKey) {
-    headers['X-Gemini-API-Key'] = userApiKey;
-  }
-
   try {
     const res  = await fetch('/api/predict', {
       method: 'POST',
-      headers: headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
@@ -241,9 +159,10 @@ function renderResults(data, ticker, mode, date) {
   document.getElementById('resultsSection').style.display = 'block';
 
   const ensemble = data.ensemble || {};
-  const direction  = (ensemble.overall_signal || 'neutral').toLowerCase();
+  const direction  = (ensemble.direction || ensemble.overall_signal || 'neutral').toLowerCase();
   const confidence = parseFloat(ensemble.confidence ?? ensemble.ensemble_confidence ?? 0);
-  const magnitude  = parseFloat(ensemble.magnitude ?? ensemble.ensemble_magnitude ?? 0);
+  const rangeText = ensemble.magnitude_range || '';
+  const magText = rangeText || 'No estimate';
 
   // Banner
   const dirLabel = direction === 'bullish' ? '↑ Bullish'
@@ -253,11 +172,13 @@ function renderResults(data, ticker, mode, date) {
   dirEl.textContent = dirLabel;
   dirEl.className   = `prediction-direction direction-${direction}`;
 
+  const companyName = COMPANY_NAMES[ticker] || ticker;
   document.getElementById('predTicker').textContent = ticker;
+  document.getElementById('predCompanyName').textContent = companyName;
   document.getElementById('predDate').textContent =
     mode === 'backtest' ? `Backtest as of ${date}` : `Live – ${new Date().toLocaleDateString('en-GB')}`;
-  document.getElementById('predMagnitude').textContent =
-    `Expected magnitude: ${(magnitude * 100).toFixed(1)}%`;
+  document.getElementById('predMagnitude').textContent = 'Expected impact:';
+  document.getElementById('predRange').textContent = magText;
 
   // Confidence ring
   const pct = Math.round(confidence * 100);
@@ -281,11 +202,9 @@ function renderResults(data, ticker, mode, date) {
   // Price context
   if (data.price_context) {
     const priceCard = document.getElementById('priceCard');
-    const priceText = typeof data.price_context === 'string'
-      ? data.price_context
-      : JSON.stringify(data.price_context, null, 2);
-    document.getElementById('priceContent').textContent = priceText;
+    document.getElementById('priceTicker').textContent = ticker;
     priceCard.style.display = 'block';
+    requestAnimationFrame(() => renderComboChart(data.price_context));
   }
 }
 
@@ -294,18 +213,16 @@ function renderIndicators(indicators) {
   const grid = document.getElementById('indicatorsGrid');
   grid.innerHTML = '';
 
-  // Sort by weighted contribution (magnitude × confidence desc)
-  const sorted = [...indicators].sort((a, b) => {
-    const scoreA = (a.magnitude || 0) * (a.confidence || 0);
-    const scoreB = (b.magnitude || 0) * (b.confidence || 0);
-    return scoreB - scoreA;
-  });
+  // Sort by confidence desc (API returns already-ranked indicators)
+  const sorted = [...indicators].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
 
   sorted.forEach((ind, idx) => {
     const signal     = (ind.signal || 'neutral').toLowerCase();
     const confidence = Math.round((ind.confidence || 0) * 100);
-    const magnitude  = Math.round(Math.abs(ind.magnitude || 0) * 100);
+    const magEstimate = ind.magnitude_estimate || '';
     const evidence   = ind.evidence_summary || ind.evidence || ind.reasoning || '';
+    const dataLag = ind.data_as_of_lag_days;
+    const lagText = dataLag != null ? `Lag: ${dataLag}d` : '';
 
     const card = document.createElement('div');
     card.className = `indicator-card signal-${signal}`;
@@ -316,7 +233,7 @@ function renderIndicators(indicators) {
       <div class="ind-header">
         <div>
           <div class="ind-name">${escHtml(friendlyName(ind.indicator || ind.agent || ''))}</div>
-          <div class="ind-source">${escHtml(ind.data_source || ind.source || '')}</div>
+          <div class="ind-source">${escHtml(ind.data_source || ind.source || '')}${lagText ? ' · ' + lagText : ''}</div>
         </div>
         <span class="signal-badge ${signal}">${signal}</span>
       </div>
@@ -327,12 +244,10 @@ function renderIndicators(indicators) {
             data-target="${confidence}"></div></div>
           <span class="bar-value">${confidence}%</span>
         </div>
-        <div class="bar-row">
-          <span class="bar-label">Magnitude</span>
-          <div class="bar-track"><div class="bar-fill mag" style="width:0%"
-            data-target="${magnitude}"></div></div>
-          <span class="bar-value">${magnitude}%</span>
-        </div>
+        ${magEstimate ? `<div class="bar-row">
+          <span class="bar-label">Estimate</span>
+          <span class="mag-estimate">${escHtml(magEstimate)}</span>
+        </div>` : ''}
       </div>
       ${evidence ? `<div class="ind-evidence">${escHtml(String(evidence).slice(0, 280))}${evidence.length > 280 ? '…' : ''}</div>` : ''}
     `;
@@ -380,10 +295,110 @@ function resetUI() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ── Combo chart (price line + volume bars) ────────────────
+let _comboChart = null;
+
+function renderComboChart(ctx) {
+  const canvas = document.getElementById('comboChart');
+  if (!canvas || !ctx.prices || ctx.prices.length < 2) return;
+  if (_comboChart) { _comboChart.destroy(); _comboChart = null; }
+
+  const labels = ctx.prices.map(p => p.date);
+  const closes = ctx.prices.map(p => p.close);
+  const volumes = ctx.prices.map(p => p.volume);
+
+  function fmt(v) {
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    return v;
+  }
+
+  _comboChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Close Price',
+          data: closes,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          borderWidth: 2,
+          pointRadius: 2,
+          pointBackgroundColor: '#3b82f6',
+          fill: true,
+          tension: 0.2,
+          yAxisID: 'y',
+          order: 1,
+        },
+        {
+          label: 'Volume',
+          type: 'bar',
+          data: volumes,
+          backgroundColor: 'rgba(148,163,184,0.2)',
+          borderColor: 'rgba(148,163,184,0.3)',
+          borderWidth: 0.5,
+          borderRadius: 2,
+          yAxisID: 'y1',
+          order: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: '#94a3b8',
+            font: { size: 11, family: "'Inter', system-ui, sans-serif" },
+            boxWidth: 14,
+            usePointStyle: true,
+            padding: 16,
+          },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(12,17,32,0.92)',
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          padding: 12,
+          callbacks: {
+            label: ctx => ctx.dataset.label === 'Volume'
+              ? 'Volume: ' + fmt(ctx.parsed.y)
+              : 'Close: $' + ctx.parsed.y.toFixed(2),
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#475569', maxTicksLimit: 8, font: { size: 10, family: "'JetBrains Mono', monospace" } },
+          grid: { display: false },
+        },
+        y: {
+          position: 'left',
+          ticks: { color: '#3b82f6', font: { size: 10, family: "'JetBrains Mono', monospace" }, callback: v => '$' + v.toFixed(0) },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          title: { display: true, text: 'Price ($)', color: '#3b82f6', font: { size: 10, family: "'Inter', system-ui, sans-serif" } },
+        },
+        y1: {
+          position: 'right',
+          ticks: { color: '#64748b', font: { size: 10, family: "'JetBrains Mono', monospace" }, callback: v => fmt(v) },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Volume', color: '#64748b', font: { size: 10, family: "'Inter', system-ui, sans-serif" } },
+        },
+      },
+      interaction: { intersect: false, mode: 'index' },
+    },
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Gear icon opens settings
-  document.getElementById('keyIndicator').addEventListener('click', toggleSettings);
-  // Load persisted key from sessionStorage
-  loadApiKey();
+  // Nothing to initialise — all auth is handled server-side via Vertex AI
 });

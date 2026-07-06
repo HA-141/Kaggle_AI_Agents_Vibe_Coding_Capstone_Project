@@ -428,6 +428,12 @@ body {
   font-weight: 600;
   color: var(--text-primary);
 }
+.prediction-company {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 2px;
+}
 .prediction-date {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -437,7 +443,13 @@ body {
 .prediction-magnitude {
   margin-top: 8px;
   font-size: 0.82rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+}
+.prediction-range {
+  margin-top: 4px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
 }
 
 .confidence-label {
@@ -583,6 +595,12 @@ body {
 .bar-fill.conf { background: var(--accent-cyan); }
 .bar-fill.mag  { background: var(--accent-violet); }
 .bar-value { width: 30px; text-align: right; font-family: var(--font-mono); }
+.mag-estimate {
+  font-size: 0.75rem;
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
 
 .ind-evidence {
   font-size: 0.78rem;
@@ -619,6 +637,18 @@ body {
   color: var(--text-muted);
   margin-bottom: 16px;
 }
+.price-title span { color: var(--accent-cyan); }
+.chart-box {
+  background: rgba(0,0,0,0.15);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  height: 280px;
+  margin-bottom: 20px;
+}
+.chart-box canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
 #priceContent {
   font-size: 0.82rem;
   font-family: var(--font-mono);
@@ -638,78 +668,21 @@ body {
   line-height: 1.8;
 }
 
-/* ── Key indicator & Settings panel ──────────────────────── */
+/* ── Header right ─────────────────────────────────────────── */
 .header-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 .key-indicator {
-  font-size: 1.2rem;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity var(--t-fast);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--accent-green);
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid rgba(74,222,128,0.2);
+  background: rgba(74,222,128,0.07);
 }
-.key-indicator:hover { opacity: 1; background: rgba(255,255,255,0.08); }
-
-.settings-panel {
-  max-width: 500px;
-  margin: -24px auto 32px;
-  padding: 24px 28px;
-  position: relative;
-  z-index: 10;
-  animation: fadeSlideUp 0.3s ease;
-}
-.settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-.settings-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.settings-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-}
-.settings-close:hover { color: var(--text-primary); background: var(--glass-bg); }
-.settings-body { display: flex; flex-direction: column; gap: 12px; }
-.settings-hint {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-.settings-hint a { color: var(--accent-cyan); }
-.settings-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dot-user { background: var(--accent-green); }
-.dot-server { background: var(--accent-blue); }
-.dot-none { background: var(--text-muted); }
-.dot-unknown { background: var(--accent-amber); }
-.settings-actions { display: flex; gap: 8px; margin-top: 4px; }
 
 /* ── Animations ──────────────────────────────────────────── */
 @keyframes fadeSlideUp {

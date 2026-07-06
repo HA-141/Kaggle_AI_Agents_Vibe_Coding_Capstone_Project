@@ -21,6 +21,7 @@ require a real GEMINI_API_KEY in the environment or working Vertex AI creds.
 
 import os
 import sys
+import time
 import asyncio
 import json
 import logging
@@ -54,14 +55,22 @@ TEST_TICKERS = ["JNJ", "NVO", "PFE", "AMGN", "GSK"]
 TIMEOUT_SECONDS = 120
 
 
+_LLM_RATE_LIMIT_DELAY = 12  # seconds between Gemini free-tier requests
+
+
+def _rate_limit():
+    time.sleep(_LLM_RATE_LIMIT_DELAY)
+
+
 def _has_api_key() -> bool:
     """Check if the environment has a usable Gemini API key or Vertex AI."""
     gk = os.environ.get("GEMINI_API_KEY", "")
     if gk and gk != "your_gemini_api_key_here":
         return True
-    if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true":
-        if os.environ.get("GOOGLE_CLOUD_PROJECT"):
-            return True
+    _is_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() == "true" or \
+                 os.environ.get("GOOGLE_GENAI_USE_ENTERPRISE", "").lower() == "true"
+    if _is_vertex and os.environ.get("GOOGLE_CLOUD_PROJECT"):
+        return True
     return False
 
 
@@ -143,6 +152,7 @@ class TestIndicatorAgents(unittest.TestCase):
         """Each indicator agent LLM call returns schema-compliant output (requires API key)."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         agents_data = [
             ("Clinical Trial Execution", run_clinical_trials),
             ("Physician Adoption Signals", run_physician_adoption),
@@ -224,6 +234,7 @@ class TestOrchestrator(unittest.TestCase):
         """Returns all 5 indicators + price + ensemble + report."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         result = run_async(run_analysis("JNJ", mode="live"))
         self.assertEqual(len(result["indicator_outputs"]), 5)
         self.assertIn("price_context", result)
@@ -234,6 +245,7 @@ class TestOrchestrator(unittest.TestCase):
         """Backtest mode caps data at as_of_date."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         result = run_async(run_analysis("NVO", mode="backtest", as_of_date="2023-06-01"))
         self.assertEqual(result["mode"], "backtest")
         self.assertEqual(result["as_of_date"], "2023-06-01")
@@ -283,6 +295,7 @@ class TestEnsembleAgent(unittest.TestCase):
         """Ensemble LLM returns valid EnsembleOutput (requires API key)."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         indicators = self._make_indicators()
         result = run_async(run_ensemble("JNJ", "2024-06-01", indicators))
         self.assertIsInstance(result, EnsembleOutput)
@@ -292,6 +305,7 @@ class TestEnsembleAgent(unittest.TestCase):
         """Ensemble ranks exactly 5 indicators, no duplicates."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         indicators = self._make_indicators()
         result = run_async(run_ensemble("JNJ", "2024-06-01", indicators))
         self.assertEqual(len(result.ranked_indicators), 5)
@@ -301,6 +315,7 @@ class TestEnsembleAgent(unittest.TestCase):
         """Headline Sentiment is always 'mainstream'."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         indicators = self._make_indicators()
         result = run_async(run_ensemble("JNJ", "2024-06-01", indicators))
         tags = result.indicator_tags
@@ -311,6 +326,7 @@ class TestEnsembleAgent(unittest.TestCase):
         """Ensemble output includes substantive uncertainty statement."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         indicators = self._make_indicators()
         result = run_async(run_ensemble("JNJ", "2024-06-01", indicators))
         self.assertGreater(len(result.uncertainty_statement), 20)
@@ -384,6 +400,7 @@ class TestReportWriter(unittest.TestCase):
         """Report writer LLM returns a string (requires API key)."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         ensemble, indicators, ctx = self._make_data()
         result = run_async(run_report_writer("JNJ", "2024-06-01", ensemble, indicators, ctx))
         self.assertIsInstance(result, str)
@@ -393,6 +410,7 @@ class TestReportWriter(unittest.TestCase):
         """Report includes overall prediction, disclaimer, and sources."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         ensemble, indicators, ctx = self._make_data()
         result = run_async(run_report_writer("JNJ", "2024-06-01", ensemble, indicators, ctx))
         self.assertIn("Overall", result)
@@ -402,6 +420,7 @@ class TestReportWriter(unittest.TestCase):
         """Report cites sources for indicators."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         ensemble, indicators, ctx = self._make_data()
         result = run_async(run_report_writer("JNJ", "2024-06-01", ensemble, indicators, ctx))
         sources_found = sum(1 for s in ["clinicaltrials.gov", "CMS", "PubMed", "USAspending", "GDELT"]
@@ -412,6 +431,7 @@ class TestReportWriter(unittest.TestCase):
         """Report includes uncertainty/disclaimer keywords."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         ensemble, indicators, ctx = self._make_data()
         result = run_async(run_report_writer("JNJ", "2024-06-01", ensemble, indicators, ctx))
         keywords = ["uncertainty", "not investment advice", "disclaimer", "risk", "warning"]
@@ -463,6 +483,7 @@ class TestBacktestRunner(unittest.TestCase):
         """Backtest pair returns scored result (requires API key)."""
         if not _has_api_key():
             self.skipTest("No API key available")
+        _rate_limit()
         result = run_async(run_backtest_pair("JNJ", "2023-01-15", 5))
         self.assertIn("ticker", result)
         self.assertIn("score", result)
@@ -611,7 +632,7 @@ if __name__ == "__main__":
     print("=" * 72)
     print(f"  API key available: {_has_api_key()}")
     print(f"  GEMINI_API_KEY set: {bool(os.environ.get('GEMINI_API_KEY') and os.environ['GEMINI_API_KEY'] != 'your_gemini_api_key_here')}")
-    print(f"  GOOGLE_GENAI_USE_VERTEXAI: {os.environ.get('GOOGLE_GENAI_USE_VERTEXAI', 'not set')}")
+    print(f"  Auth mode: {'Vertex AI' if os.environ.get('GOOGLE_GENAI_USE_VERTEXAI', '').lower() == 'true' or os.environ.get('GOOGLE_GENAI_USE_ENTERPRISE', '').lower() == 'true' else 'Developer API'}")
     print(f"  GOOGLE_CLOUD_PROJECT: {os.environ.get('GOOGLE_CLOUD_PROJECT', 'not set')}")
     print("=" * 72)
     print()

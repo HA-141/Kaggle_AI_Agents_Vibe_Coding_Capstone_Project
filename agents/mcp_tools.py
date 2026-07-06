@@ -70,6 +70,7 @@ async def call_mcp_tool(server_script: str, tool_name: str, arguments: dict) -> 
         "PATH", "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV",
         # Vertex AI / Gemini auth
         "GOOGLE_GENAI_USE_VERTEXAI",
+        "GOOGLE_GENAI_USE_ENTERPRISE",
         "GOOGLE_CLOUD_PROJECT",
         "GOOGLE_CLOUD_LOCATION",
         "GOOGLE_APPLICATION_CREDENTIALS",
