@@ -1,5 +1,7 @@
 # MedTech Stock Analyst
 
+**[Kaggle Competition Writeup](https://www.kaggle.com/competitions/vibecoding-agents-capstone-project/writeups/medtech-stock-analyst-multi-agent-ai-for-evidence)**
+
 A multi-agent AI system that predicts short-term stock movements for five healthcare companies (JNJ, NVO, PFE, AMGN, GSK) by analysing clinical trials, Medicare prescriber data, PubMed publications, government contracts, and news sentiment.
 
 ## Quick-Start
